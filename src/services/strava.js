@@ -1,33 +1,60 @@
-const CLUB_ID = '1725785';
+const CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
+const CLIENT_SECRET = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
+const REFRESH_TOKEN = import.meta.env.VITE_STRAVA_REFRESH_TOKEN;
+const CLUB_ID = import.meta.env.VITE_STRAVA_CLUB_ID;
 
-// Mock data to ensure the UI looks good even without API keys
-const MOCK_ACTIVITIES = [
-    { id: 1, name: 'Morning Zwift Island Hop', distance: 25000, moving_time: 3600, type: 'VirtualRide', athlete: { firstname: 'Sarah', lastname: 'L.' } },
-    { id: 2, name: 'Lunch Run', distance: 5000, moving_time: 1500, type: 'Run', athlete: { firstname: 'Jenny', lastname: 'C.' } },
-    { id: 3, name: 'Full Body Destroy', distance: 0, moving_time: 2700, type: 'WeightTraining', athlete: { firstname: 'Mike', lastname: 'B.' } },
-    { id: 4, name: 'Recovery Swim', distance: 1500, moving_time: 2400, type: 'Swim', athlete: { firstname: 'Tom', lastname: 'H.' } },
-    { id: 5, name: 'Sunday Cafe Ride', distance: 80000, moving_time: 10800, type: 'Ride', athlete: { firstname: 'Sarah', lastname: 'L.' } },
-];
+let accessToken = null;
 
-const MOCK_MEMBERS = [
-    { firstname: 'Fajrizky', lastname: 'M.', profile: null },
-    { firstname: 'Sarah', lastname: 'L.', profile: null },
-    { firstname: 'Mike', lastname: 'B.', profile: null },
-    { firstname: 'Jenny', lastname: 'C.', profile: null },
-    { firstname: 'Tom', lastname: 'H.', profile: null },
-];
+const getAccessToken = async () => {
+    if (accessToken) return accessToken;
 
-export const getClubActivities = async () => {
-    // In a real app, we would fetch from Strava API here.
-    // Requires OAuth token exchange which is complex for a static demo.
-    // Returning mock data for the "Cardio Crisis Crew" vibe.
-    return new Promise((resolve) => {
-        setTimeout(() => resolve(MOCK_ACTIVITIES), 500);
-    });
+    try {
+        const response = await fetch('https://www.strava.com/oauth/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                refresh_token: REFRESH_TOKEN,
+                grant_type: 'refresh_token',
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to refresh Strava token');
+        }
+
+        const data = await response.json();
+        accessToken = data.access_token;
+        return accessToken;
+    } catch (error) {
+        console.error("Auth Error:", error);
+        return null;
+    }
 };
 
-export const getClubMembers = async () => {
-    return new Promise((resolve) => {
-        setTimeout(() => resolve(MOCK_MEMBERS), 500);
-    });
+export const getClubActivities = async () => {
+    const token = await getAccessToken();
+    if (!token) return [];
+
+    try {
+        const response = await fetch(`https://www.strava.com/api/v3/clubs/${CLUB_ID}/activities`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            console.error("Strava API Error:", response.statusText);
+            return [];
+        }
+
+        const activities = await response.json();
+        return activities;
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        return [];
+    }
 };
